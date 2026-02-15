@@ -120,3 +120,31 @@
     @apply bg-background text-foreground;
   }
 }
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0) translateX(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.3;
+  }
+  90% {
+    opacity: 0.3;
+  }
+  50% {
+    transform: translateY(-100vh) translateX(var(--float-x));
+  }
+}
+
+@layer utilities {
+  .animate-float {
+    animation: float linear infinite;
+    --float-x: 0px;
+  }
+}

@@ -1,617 +1,20 @@
-// "use client";
-
-// import { useState, useCallback, useEffect } from "react";
-// import {
-//   Room,
-//   RoomEvent,
-//   RemoteParticipant,
-//   LocalParticipant,
-//   Participant,
-//   Track,
-//   VideoTrack,
-//   AudioTrack,
-//   ConnectionState,
-//   ParticipantEvent,
-//   TrackPublication,
-//   RemoteTrackPublication,
-//   LocalTrackPublication,
-//   VideoPresets,
-//   AudioPresets,
-// } from "livekit-client";
-// import { toast } from "sonner";
-// import {
-//   Video,
-//   VideoOff,
-//   Mic,
-//   MicOff,
-//   Phone,
-//   PhoneOff,
-//   Settings,
-//   Copy,
-//   Users,
-//   Share,
-//   Monitor,
-//   MonitorOff,
-// } from "lucide-react";
-// import { Button } from "@/components/ui/button";
-// import { Input } from "@/components/ui/input";
-// import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-// import { Badge } from "@/components/ui/badge";
-// import { Separator } from "@/components/ui/separator";
-
-// interface VideoCallProps {
-//   initialRoom?: string;
-//   initialName?: string;
-// }
-
-// interface ParticipantInfo {
-//   identity: string;
-//   name: string;
-//   isLocal: boolean;
-//   videoTrack?: VideoTrack;
-//   audioTrack?: AudioTrack;
-//   isVideoEnabled: boolean;
-//   isAudioEnabled: boolean;
-// }
-
-// export default function VideoCall({
-//   initialRoom = "",
-//   initialName = "",
-// }: VideoCallProps) {
-//   // State management
-//   const [roomName, setRoomName] = useState<string>(initialRoom);
-//   const [participantName, setParticipantName] = useState<string>(initialName);
-//   const [isJoined, setIsJoined] = useState<boolean>(false);
-//   const [isLoading, setIsLoading] = useState<boolean>(false);
-//   const [room, setRoom] = useState<Room | null>(null);
-//   const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
-//   const [localParticipant, setLocalParticipant] =
-//     useState<LocalParticipant | null>(null);
-//   const [connectionState, setConnectionState] = useState<ConnectionState>(
-//     ConnectionState.Disconnected
-//   );
-//   const [isVideoEnabled, setIsVideoEnabled] = useState<boolean>(true);
-//   const [isAudioEnabled, setIsAudioEnabled] = useState<boolean>(true);
-//   const [isScreenSharing, setIsScreenSharing] = useState<boolean>(false);
-
-//   // Helper function to get video track from participant
-//   const getVideoTrack = (participant: Participant): VideoTrack | undefined => {
-//     const videoPublication = participant.videoTrackPublications
-//       .values()
-//       .next().value;
-//     return videoPublication?.track as VideoTrack;
-//   };
-
-//   // Helper function to get audio track from participant
-//   const getAudioTrack = (participant: Participant): AudioTrack | undefined => {
-//     const audioPublication = participant.audioTrackPublications
-//       .values()
-//       .next().value;
-//     return audioPublication?.track as AudioTrack;
-//   };
-
-//   // Join room function
-//   const joinRoom = useCallback(async () => {
-//     if (!roomName.trim() || !participantName.trim()) {
-//       toast.error("Please enter both room name and participant name");
-//       return;
-//     }
-
-//     setIsLoading(true);
-
-//     try {
-//       // Create room instance
-//       const newRoom = new Room({
-//         adaptiveStream: true,
-//         dynacast: true,
-//         videoCaptureDefaults: {
-//           resolution: VideoPresets.h720.resolution, // Add .resolution property
-//           frameRate: 30,
-//           facingMode: "user",
-//         },
-//         publishDefaults: {
-//           videoEncoding: {
-//             maxBitrate: 1_500_000,
-//             maxFramerate: 30,
-//           },
-//           audioPreset: AudioPresets.speech,
-//           videoSimulcastLayers: [
-//             VideoPresets.h360,
-//             VideoPresets.h540,
-//             VideoPresets.h720,
-//           ],
-//         },
-//       });
-
-//       // Get token from your API
-//       const response = await fetch("/api/token", {
-//         method: "POST",
-//         headers: {
-//           "Content-Type": "application/json",
-//         },
-//         body: JSON.stringify({
-//           room: roomName, // Change to "room"
-//           username: participantName, // Change to "username"
-//         }),
-//       });
-//       console.log("Response:", response);
-
-//       if (!response.ok) {
-//         throw new Error("Failed to get access token");
-//       }
-
-//       const { token } = await response.json();
-
-//       // Set up event listeners
-//       newRoom.on(RoomEvent.Connected, () => {
-//         setConnectionState(ConnectionState.Connected);
-//         setIsJoined(true);
-//         toast.success("Successfully joined the room!");
-//       });
-
-//       newRoom.on(RoomEvent.Disconnected, () => {
-//         setConnectionState(ConnectionState.Disconnected);
-//         setIsJoined(false);
-//         toast.info("Disconnected from room");
-//       });
-
-//       newRoom.on(
-//         RoomEvent.ParticipantConnected,
-//         (participant: RemoteParticipant) => {
-//           toast.success(
-//             `${participant.name || participant.identity} joined the room`
-//           );
-//           updateParticipants(newRoom);
-//         }
-//       );
-
-//       newRoom.on(
-//         RoomEvent.ParticipantDisconnected,
-//         (participant: RemoteParticipant) => {
-//           toast.info(
-//             `${participant.name || participant.identity} left the room`
-//           );
-//           updateParticipants(newRoom);
-//         }
-//       );
-
-//       newRoom.on(RoomEvent.TrackSubscribed, () => {
-//         updateParticipants(newRoom);
-//       });
-
-//       newRoom.on(RoomEvent.TrackUnsubscribed, () => {
-//         updateParticipants(newRoom);
-//       });
-
-//       newRoom.on(RoomEvent.LocalTrackPublished, () => {
-//         updateParticipants(newRoom);
-//       });
-
-//       newRoom.on(RoomEvent.LocalTrackUnpublished, () => {
-//         updateParticipants(newRoom);
-//       });
-
-//       newRoom.on(RoomEvent.TrackMuted, () => {
-//         updateParticipants(newRoom);
-//       });
-
-//       newRoom.on(RoomEvent.TrackUnmuted, () => {
-//         updateParticipants(newRoom);
-//       });
-
-//       // Connect to room
-//       await newRoom.connect(process.env.NEXT_PUBLIC_LIVEKIT_URL!, token);
-
-//       setRoom(newRoom);
-//       setLocalParticipant(newRoom.localParticipant);
-//       updateParticipants(newRoom);
-
-//       // Enable camera and microphone
-//       await newRoom.localParticipant.enableCameraAndMicrophone();
-//     } catch (error) {
-//       console.error("Error joining room:", error);
-//       toast.error("Failed to join room. Please try again.");
-//     } finally {
-//       setIsLoading(false);
-//     }
-//   }, [roomName, participantName]);
-
-//   // Update participants function
-//   const updateParticipants = useCallback((room: Room) => {
-//     const allParticipants: ParticipantInfo[] = [];
-
-//     // Add local participant
-//     const localPart = room.localParticipant;
-//     allParticipants.push({
-//       identity: localPart.identity,
-//       name: localPart.name || localPart.identity,
-//       isLocal: true,
-//       videoTrack: getVideoTrack(localPart),
-//       audioTrack: getAudioTrack(localPart),
-//       isVideoEnabled: localPart.isCameraEnabled,
-//       isAudioEnabled: localPart.isMicrophoneEnabled,
-//     });
-
-//     // Add remote participants
-//     room.remoteParticipants.forEach((participant) => {
-//       allParticipants.push({
-//         identity: participant.identity,
-//         name: participant.name || participant.identity,
-//         isLocal: false,
-//         videoTrack: getVideoTrack(participant),
-//         audioTrack: getAudioTrack(participant),
-//         isVideoEnabled: participant.isCameraEnabled,
-//         isAudioEnabled: participant.isMicrophoneEnabled,
-//       });
-//     });
-
-//     setParticipants(allParticipants);
-//   }, []);
-
-//   // Toggle video function
-//   const toggleVideo = useCallback(async () => {
-//     if (!localParticipant) return;
-
-//     try {
-//       await localParticipant.setCameraEnabled(!isVideoEnabled);
-//       setIsVideoEnabled(!isVideoEnabled);
-//       toast.success(isVideoEnabled ? "Camera turned off" : "Camera turned on");
-//     } catch (error) {
-//       toast.error("Failed to toggle camera");
-//     }
-//   }, [localParticipant, isVideoEnabled]);
-
-//   // Toggle audio function
-//   const toggleAudio = useCallback(async () => {
-//     if (!localParticipant) return;
-
-//     try {
-//       await localParticipant.setMicrophoneEnabled(!isAudioEnabled);
-//       setIsAudioEnabled(!isAudioEnabled);
-//       toast.success(isAudioEnabled ? "Microphone muted" : "Microphone unmuted");
-//     } catch (error) {
-//       toast.error("Failed to toggle microphone");
-//     }
-//   }, [localParticipant, isAudioEnabled]);
-
-//   // Toggle screen share function
-//   const toggleScreenShare = useCallback(async () => {
-//     if (!localParticipant) return;
-
-//     try {
-//       if (isScreenSharing) {
-//         await localParticipant.setScreenShareEnabled(false);
-//         setIsScreenSharing(false);
-//         toast.success("Screen sharing stopped");
-//       } else {
-//         await localParticipant.setScreenShareEnabled(true);
-//         setIsScreenSharing(true);
-//         toast.success("Screen sharing started");
-//       }
-//     } catch (error) {
-//       toast.error("Failed to toggle screen sharing");
-//     }
-//   }, [localParticipant, isScreenSharing]);
-
-//   // Leave room function
-//   const leaveRoom = useCallback(async () => {
-//     if (room) {
-//       await room.disconnect();
-//       setRoom(null);
-//       setLocalParticipant(null);
-//       setParticipants([]);
-//       setIsJoined(false);
-//       setIsVideoEnabled(true);
-//       setIsAudioEnabled(true);
-//       setIsScreenSharing(false);
-//       toast.success("Left the room");
-//     }
-//   }, [room]);
-
-//   // Copy room link function
-//   const copyRoomLink = useCallback(() => {
-//     const roomLink = `${window.location.origin}?room=${encodeURIComponent(
-//       roomName
-//     )}`;
-//     navigator.clipboard.writeText(roomLink);
-//     toast.success("Room link copied to clipboard!");
-//   }, [roomName]);
-
-//   // Video component for participants
-//   const VideoComponent = ({
-//     participant,
-//   }: {
-//     participant: ParticipantInfo;
-//   }) => {
-//     const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(
-//       null
-//     );
-
-//     useEffect(() => {
-//       if (videoElement && participant.videoTrack) {
-//         participant.videoTrack.attach(videoElement);
-//         return () => {
-//           participant.videoTrack?.detach(videoElement);
-//         };
-//       }
-//     }, [videoElement, participant.videoTrack]);
-
-//     return (
-//       <div className="relative group">
-//         <Card className="overflow-hidden bg-slate-900/50 backdrop-blur-sm border-slate-700/50">
-//           <CardContent className="p-0">
-//             <div className="aspect-video bg-slate-800 flex items-center justify-center relative">
-//               {participant.videoTrack && participant.isVideoEnabled ? (
-//                 <video
-//                   ref={setVideoElement}
-//                   className="w-full h-full object-cover"
-//                   autoPlay
-//                   playsInline
-//                   muted={participant.isLocal}
-//                 />
-//               ) : (
-//                 <div className="w-full h-full flex items-center justify-center">
-//                   <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center text-white font-bold text-xl">
-//                     {participant.name.charAt(0).toUpperCase()}
-//                   </div>
-//                 </div>
-//               )}
-
-//               {/* Participant info overlay */}
-//               <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
-//                 <div className="flex items-center gap-2">
-//                   <Badge
-//                     variant={participant.isLocal ? "default" : "secondary"}
-//                     className="text-xs"
-//                   >
-//                     {participant.name}
-//                     {participant.isLocal && " (You)"}
-//                   </Badge>
-//                 </div>
-//                 <div className="flex items-center gap-1">
-//                   {!participant.isAudioEnabled && (
-//                     <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
-//                       <MicOff className="w-3 h-3 text-white" />
-//                     </div>
-//                   )}
-//                   {!participant.isVideoEnabled && (
-//                     <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
-//                       <VideoOff className="w-3 h-3 text-white" />
-//                     </div>
-//                   )}
-//                 </div>
-//               </div>
-//             </div>
-//           </CardContent>
-//         </Card>
-//       </div>
-//     );
-//   };
-
-//   // Cleanup on unmount
-//   useEffect(() => {
-//     return () => {
-//       if (room) {
-//         room.disconnect();
-//       }
-//     };
-//   }, [room]);
-
-//   // Join screen
-//   if (!isJoined) {
-//     return (
-//       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
-//         <div className="w-full max-w-md">
-//           <Card className="bg-white/10 backdrop-blur-xl border-white/20 shadow-2xl">
-//             <CardHeader className="text-center">
-//               <CardTitle className="text-3xl font-bold text-white mb-2">
-//                 Join Video Call
-//               </CardTitle>
-//               <p className="text-slate-300">
-//                 Enter your details to join the conversation
-//               </p>
-//             </CardHeader>
-//             <CardContent className="space-y-4">
-//               <div className="space-y-2">
-//                 <label className="text-sm font-medium text-slate-200">
-//                   Room Name
-//                 </label>
-//                 <Input
-//                   type="text"
-//                   placeholder="Enter room name"
-//                   value={roomName}
-//                   onChange={(e) => setRoomName(e.target.value)}
-//                   className="bg-white/10 border-white/20 text-white placeholder:text-slate-400"
-//                 />
-//               </div>
-
-//               <div className="space-y-2">
-//                 <label className="text-sm font-medium text-slate-200">
-//                   Your Name
-//                 </label>
-//                 <Input
-//                   type="text"
-//                   placeholder="Enter your name"
-//                   value={participantName}
-//                   onChange={(e) => setParticipantName(e.target.value)}
-//                   className="bg-white/10 border-white/20 text-white placeholder:text-slate-400"
-//                 />
-//               </div>
-
-//               <Button
-//                 onClick={joinRoom}
-//                 disabled={
-//                   isLoading || !roomName.trim() || !participantName.trim()
-//                 }
-//                 className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-3 rounded-lg transition-all duration-200 transform hover:scale-105"
-//               >
-//                 {isLoading ? (
-//                   <div className="flex items-center gap-2">
-//                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-//                     Joining...
-//                   </div>
-//                 ) : (
-//                   <div className="flex items-center gap-2">
-//                     <Video className="w-5 h-5" />
-//                     Join Room
-//                   </div>
-//                 )}
-//               </Button>
-
-//               {roomName && (
-//                 <div className="pt-4 border-t border-white/20">
-//                   <Button
-//                     onClick={copyRoomLink}
-//                     variant="outline"
-//                     className="w-full bg-transparent border-white/20 text-white hover:bg-white/10"
-//                   >
-//                     <Copy className="w-4 h-4 mr-2" />
-//                     Copy Room Link
-//                   </Button>
-//                 </div>
-//               )}
-//             </CardContent>
-//           </Card>
-//         </div>
-//       </div>
-//     );
-//   }
-
-//   // Video call interface
-//   return (
-//     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-//       {/* Header */}
-//       <div className="bg-black/20 backdrop-blur-sm border-b border-white/10 p-4">
-//         <div className="flex items-center justify-between">
-//           <div className="flex items-center gap-4">
-//             <h1 className="text-xl font-bold text-white">{roomName}</h1>
-//             <Badge variant="outline" className="border-white/20 text-white">
-//               <Users className="w-4 h-4 mr-1" />
-//               {participants.length} participant
-//               {participants.length !== 1 ? "s" : ""}
-//             </Badge>
-//           </div>
-
-//           <div className="flex items-center gap-2">
-//             <Button
-//               onClick={copyRoomLink}
-//               variant="outline"
-//               size="sm"
-//               className="border-white/20 text-white hover:bg-white/10"
-//             >
-//               <Copy className="w-4 h-4 mr-1" />
-//               Copy Link
-//             </Button>
-//             <Button
-//               onClick={leaveRoom}
-//               variant="destructive"
-//               size="sm"
-//               className="bg-red-600 hover:bg-red-700"
-//             >
-//               <PhoneOff className="w-4 h-4 mr-1" />
-//               Leave
-//             </Button>
-//           </div>
-//         </div>
-//       </div>
-
-//       {/* Video Grid */}
-//       <div className="flex-1 p-4">
-//         <div
-//           className={`grid gap-4 h-full ${
-//             participants.length === 1
-//               ? "grid-cols-1"
-//               : participants.length === 2
-//               ? "grid-cols-2"
-//               : participants.length <= 4
-//               ? "grid-cols-2"
-//               : "grid-cols-3"
-//           }`}
-//         >
-//           {participants.map((participant) => (
-//             <VideoComponent
-//               key={participant.identity}
-//               participant={participant}
-//             />
-//           ))}
-//         </div>
-//       </div>
-
-//       {/* Control Bar */}
-//       <div className="bg-black/20 backdrop-blur-sm border-t border-white/10 p-4">
-//         <div className="flex items-center justify-center gap-4">
-//           <Button
-//             onClick={toggleAudio}
-//             variant={isAudioEnabled ? "default" : "destructive"}
-//             size="lg"
-//             className="rounded-full w-12 h-12 p-0"
-//           >
-//             {isAudioEnabled ? (
-//               <Mic className="w-6 h-6" />
-//             ) : (
-//               <MicOff className="w-6 h-6" />
-//             )}
-//           </Button>
-
-//           <Button
-//             onClick={toggleVideo}
-//             variant={isVideoEnabled ? "default" : "destructive"}
-//             size="lg"
-//             className="rounded-full w-12 h-12 p-0"
-//           >
-//             {isVideoEnabled ? (
-//               <Video className="w-6 h-6" />
-//             ) : (
-//               <VideoOff className="w-6 h-6" />
-//             )}
-//           </Button>
-
-//           <Button
-//             onClick={toggleScreenShare}
-//             variant={isScreenSharing ? "default" : "outline"}
-//             size="lg"
-//             className="rounded-full w-12 h-12 p-0"
-//           >
-//             {isScreenSharing ? (
-//               <MonitorOff className="w-6 h-6" />
-//             ) : (
-//               <Monitor className="w-6 h-6" />
-//             )}
-//           </Button>
-
-//           <Button
-//             onClick={leaveRoom}
-//             variant="destructive"
-//             size="lg"
-//             className="rounded-full w-12 h-12 p-0 bg-red-600 hover:bg-red-700"
-//           >
-//             <PhoneOff className="w-6 h-6" />
-//           </Button>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// }
-
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import {
   Room,
   RoomEvent,
   RemoteParticipant,
   LocalParticipant,
   Participant,
-  Track,
   VideoTrack,
   AudioTrack,
   ConnectionState,
-  ParticipantEvent,
-  TrackPublication,
-  RemoteTrackPublication,
-  LocalTrackPublication,
   VideoPresets,
   AudioPresets,
+  Track,
+  createLocalVideoTrack,
+  createLocalAudioTrack,
 } from "livekit-client";
 import { toast } from "sonner";
 import {
@@ -619,20 +22,20 @@ import {
   VideoOff,
   Mic,
   MicOff,
-  Phone,
   PhoneOff,
-  Settings,
   Copy,
   Users,
-  Share,
   Monitor,
   MonitorOff,
+  MessageCircle,
+  X,
+  Send,
+  Wifi,
+  Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 
 interface VideoCallProps {
   initialRoom?: string;
@@ -645,324 +48,925 @@ interface ParticipantInfo {
   isLocal: boolean;
   videoTrack?: VideoTrack;
   audioTrack?: AudioTrack;
+  screenShareTrack?: VideoTrack;
   isVideoEnabled: boolean;
   isAudioEnabled: boolean;
+  isSpeaking?: boolean;
 }
+
+interface ChatMessage {
+  id: string;
+  message: string;
+  from: { identity: string; name: string };
+  timestamp: number;
+}
+
+// ─── Chat Panel ───────────────────────────────────────────────────────────────
+
+interface ChatPanelProps {
+  showChat: boolean;
+  chatMessages: ChatMessage[];
+  messageInput: string;
+  isSendingMessage: boolean;
+  currentUserIdentity: string;
+  onToggleChat: () => void;
+  onMessageChange: (v: string) => void;
+  onSendMessage: () => void;
+  messagesEndRef: React.RefObject<HTMLDivElement | null>;
+}
+
+const ChatPanel = ({
+  showChat,
+  chatMessages,
+  messageInput,
+  isSendingMessage,
+  currentUserIdentity,
+  onToggleChat,
+  onMessageChange,
+  onSendMessage,
+  messagesEndRef,
+}: ChatPanelProps) => {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (showChat) setTimeout(() => inputRef.current?.focus(), 100);
+  }, [showChat]);
+
+  if (!showChat) return null;
+
+  return (
+    <div
+      className="fixed right-5 bottom-28 flex flex-col z-50"
+      style={{
+        width: 360,
+        height: 480,
+        background: "rgba(10,10,18,0.92)",
+        backdropFilter: "blur(24px)",
+        border: "1px solid rgba(255,255,255,0.08)",
+        borderRadius: 20,
+        boxShadow:
+          "0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)",
+        overflow: "hidden",
+      }}
+    >
+      {/* Header */}
+      <div
+        style={{
+          padding: "14px 16px",
+          borderBottom: "1px solid rgba(255,255,255,0.07)",
+          background: "rgba(255,255,255,0.03)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <MessageCircle size={16} style={{ color: "#a78bfa" }} />
+          <span
+            style={{
+              color: "#fff",
+              fontWeight: 600,
+              fontSize: 14,
+              letterSpacing: 0.2,
+            }}
+          >
+            Messages
+          </span>
+          {chatMessages.length > 0 && (
+            <span
+              style={{
+                background: "rgba(167,139,250,0.2)",
+                color: "#a78bfa",
+                fontSize: 11,
+                fontWeight: 700,
+                borderRadius: 99,
+                padding: "1px 7px",
+              }}
+            >
+              {chatMessages.length}
+            </span>
+          )}
+        </div>
+        <button
+          onClick={onToggleChat}
+          style={{
+            background: "rgba(255,255,255,0.06)",
+            border: "none",
+            borderRadius: 8,
+            width: 28,
+            height: 28,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            color: "#9ca3af",
+          }}
+        >
+          <X size={14} />
+        </button>
+      </div>
+
+      {/* Messages */}
+      <div
+        style={{
+          flex: 1,
+          overflowY: "auto",
+          padding: "16px",
+          display: "flex",
+          flexDirection: "column",
+          gap: 12,
+        }}
+      >
+        {chatMessages.length === 0 ? (
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "rgba(255,255,255,0.2)",
+            }}
+          >
+            <MessageCircle
+              size={36}
+              style={{ marginBottom: 12, opacity: 0.4 }}
+            />
+            <p style={{ fontSize: 13, margin: 0 }}>No messages yet</p>
+          </div>
+        ) : (
+          chatMessages.map((msg) => {
+            const isOwn = msg.from.identity === currentUserIdentity;
+            return (
+              <div
+                key={msg.id}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: isOwn ? "flex-end" : "flex-start",
+                }}
+              >
+                {!isOwn && (
+                  <span
+                    style={{
+                      fontSize: 11,
+                      color: "#a78bfa",
+                      marginBottom: 4,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {msg.from.name}
+                  </span>
+                )}
+                <div
+                  style={{
+                    maxWidth: "80%",
+                    padding: "8px 13px",
+                    borderRadius: isOwn
+                      ? "14px 14px 4px 14px"
+                      : "14px 14px 14px 4px",
+                    background: isOwn
+                      ? "linear-gradient(135deg, #7c3aed, #db2777)"
+                      : "rgba(255,255,255,0.07)",
+                    color: "#fff",
+                    fontSize: 13,
+                    lineHeight: 1.5,
+                    wordBreak: "break-word",
+                    border: isOwn ? "none" : "1px solid rgba(255,255,255,0.06)",
+                  }}
+                >
+                  {msg.message}
+                </div>
+                <span
+                  style={{
+                    fontSize: 10,
+                    color: "rgba(255,255,255,0.25)",
+                    marginTop: 4,
+                  }}
+                >
+                  {new Date(msg.timestamp).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>
+              </div>
+            );
+          })
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Input */}
+      <div
+        style={{
+          padding: "12px 14px",
+          borderTop: "1px solid rgba(255,255,255,0.07)",
+          background: "rgba(255,255,255,0.02)",
+        }}
+      >
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (messageInput.trim()) onSendMessage();
+          }}
+          style={{ display: "flex", gap: 8 }}
+        >
+          <input
+            ref={inputRef}
+            type="text"
+            value={messageInput}
+            onChange={(e) => onMessageChange(e.target.value)}
+            placeholder="Send a message…"
+            disabled={isSendingMessage}
+            maxLength={500}
+            autoComplete="off"
+            style={{
+              flex: 1,
+              background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: 12,
+              padding: "10px 14px",
+              color: "#fff",
+              fontSize: 13,
+              outline: "none",
+            }}
+          />
+          <button
+            type="submit"
+            disabled={!messageInput.trim() || isSendingMessage}
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 12,
+              background: messageInput.trim()
+                ? "linear-gradient(135deg, #7c3aed, #db2777)"
+                : "rgba(255,255,255,0.06)",
+              border: "none",
+              cursor: messageInput.trim() ? "pointer" : "default",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#fff",
+              flexShrink: 0,
+            }}
+          >
+            <Send size={15} />
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// ─── Video Tile ───────────────────────────────────────────────────────────────
+
+/**
+ * KEY FIX: Local video uses getUserMedia directly via a separate effect that
+ * doesn't skip isLocal. Remote participants use track.attach() as normal.
+ * This avoids the blank-tile issue where local videoTrack.attach() was
+ * conditionally skipped or the element was never wired up.
+ */
+const VideoTile = ({
+  participant,
+  isLarge = false,
+}: {
+  participant: ParticipantInfo;
+  isLarge?: boolean;
+}) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const screenRef = useRef<HTMLVideoElement>(null);
+
+  // ── Local camera: attach via track.attach (works for local too!) ──────────
+  useEffect(() => {
+    const el = videoRef.current;
+    const track = participant.videoTrack;
+    if (!el || !track) return;
+
+    // LiveKit's attach() works for both local and remote tracks
+    track.attach(el);
+    return () => {
+      track.detach(el);
+    };
+  }, [participant.videoTrack]);
+
+  // ── Remote audio ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    const el = audioRef.current;
+    const track = participant.audioTrack;
+    if (!el || !track || participant.isLocal) return;
+
+    track.attach(el);
+    return () => {
+      track.detach(el);
+    };
+  }, [participant.audioTrack, participant.isLocal]);
+
+  // ── Screen share ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    const el = screenRef.current;
+    const track = participant.screenShareTrack;
+    if (!el || !track) return;
+
+    track.attach(el);
+    return () => {
+      track.detach(el);
+    };
+  }, [participant.screenShareTrack]);
+
+  const initial = participant.name.charAt(0).toUpperCase();
+  const showVideo = participant.videoTrack && participant.isVideoEnabled;
+  const hasScreen = !!participant.screenShareTrack;
+
+  return (
+    <div
+      style={{
+        position: "relative",
+        borderRadius: 18,
+        overflow: "hidden",
+        background: "#0d0d14",
+        border: participant.isSpeaking
+          ? "2px solid rgba(167,139,250,0.7)"
+          : "1px solid rgba(255,255,255,0.07)",
+        boxShadow: participant.isSpeaking
+          ? "0 0 0 4px rgba(167,139,250,0.15)"
+          : "0 8px 32px rgba(0,0,0,0.5)",
+        transition: "border-color 0.2s, box-shadow 0.2s",
+        height: "100%",
+        minHeight: isLarge ? 380 : 200,
+      }}
+    >
+      {/* Screen share layer */}
+      {hasScreen && (
+        <video
+          ref={screenRef}
+          autoPlay
+          playsInline
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            objectFit: "contain",
+            background: "#000",
+          }}
+        />
+      )}
+
+      {/* Camera layer */}
+      {!hasScreen && showVideo && (
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted={participant.isLocal}
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            transform: participant.isLocal ? "scaleX(-1)" : "none", // mirror local
+          }}
+        />
+      )}
+
+      {/* Avatar fallback */}
+      {!hasScreen && !showVideo && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "radial-gradient(ellipse at 50% 30%, #1a1035, #0a0a14)",
+          }}
+        >
+          <div
+            style={{
+              width: isLarge ? 88 : 64,
+              height: isLarge ? 88 : 64,
+              borderRadius: "50%",
+              background: "linear-gradient(135deg, #7c3aed 0%, #db2777 100%)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: isLarge ? 36 : 26,
+              fontWeight: 700,
+              color: "#fff",
+              boxShadow: "0 8px 32px rgba(124,58,237,0.4)",
+              flexShrink: 0,
+            }}
+          >
+            {initial}
+          </div>
+          <p
+            style={{
+              color: "rgba(255,255,255,0.4)",
+              fontSize: 12,
+              marginTop: 12,
+            }}
+          >
+            Camera off
+          </p>
+        </div>
+      )}
+
+      {/* Hidden audio element */}
+      {!participant.isLocal && (
+        <audio
+          ref={audioRef}
+          autoPlay
+          playsInline
+          style={{ display: "none" }}
+        />
+      )}
+
+      {/* Bottom bar */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          padding: "32px 14px 14px",
+          background: "linear-gradient(transparent, rgba(0,0,0,0.75))",
+          display: "flex",
+          alignItems: "flex-end",
+          justifyContent: "space-between",
+          pointerEvents: "none",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span
+            style={{
+              background: "rgba(0,0,0,0.55)",
+              backdropFilter: "blur(8px)",
+              border: "1px solid rgba(255,255,255,0.12)",
+              borderRadius: 99,
+              padding: "4px 10px",
+              color: "#fff",
+              fontSize: 12,
+              fontWeight: 500,
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            {participant.isLocal && (
+              <span
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: "50%",
+                  background: "#22c55e",
+                  display: "inline-block",
+                  flexShrink: 0,
+                }}
+              />
+            )}
+            {participant.name}
+            {participant.isLocal && " (You)"}
+          </span>
+
+          {/* Speaking indicator */}
+          {participant.isSpeaking && !participant.isLocal && (
+            <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+              {[0, 75, 150].map((delay) => (
+                <div
+                  key={delay}
+                  style={{
+                    width: 3,
+                    height: delay === 75 ? 14 : 10,
+                    borderRadius: 99,
+                    background: "#a78bfa",
+                    animation: `pulse 0.8s ease-in-out infinite`,
+                    animationDelay: `${delay}ms`,
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: "flex", gap: 6 }}>
+          {!participant.isAudioEnabled && (
+            <span
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: "50%",
+                background: "rgba(239,68,68,0.85)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <MicOff size={13} color="#fff" />
+            </span>
+          )}
+          {!participant.isVideoEnabled && !hasScreen && (
+            <span
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: "50%",
+                background: "rgba(239,68,68,0.85)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <VideoOff size={13} color="#fff" />
+            </span>
+          )}
+          {hasScreen && (
+            <span
+              style={{
+                padding: "4px 10px",
+                borderRadius: 99,
+                background: "rgba(59,130,246,0.85)",
+                color: "#fff",
+                fontSize: 11,
+                fontWeight: 600,
+                display: "flex",
+                alignItems: "center",
+                gap: 5,
+              }}
+            >
+              <Monitor size={11} />
+              Screen
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Control Button ───────────────────────────────────────────────────────────
+
+const CtrlBtn = ({
+  active,
+  danger,
+  onClick,
+  children,
+  label,
+}: {
+  active: boolean;
+  danger?: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+  label: string;
+}) => (
+  <button
+    onClick={onClick}
+    title={label}
+    style={{
+      width: 52,
+      height: 52,
+      borderRadius: 16,
+      border: danger
+        ? "none"
+        : active
+          ? "1px solid rgba(255,255,255,0.15)"
+          : "1px solid rgba(239,68,68,0.4)",
+      background: danger
+        ? "linear-gradient(135deg, #dc2626, #b91c1c)"
+        : active
+          ? "rgba(255,255,255,0.1)"
+          : "rgba(239,68,68,0.15)",
+      color: danger ? "#fff" : active ? "#fff" : "#ef4444",
+      cursor: "pointer",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      transition: "all 0.15s",
+    }}
+    onMouseOver={(e) => {
+      (e.currentTarget as HTMLButtonElement).style.transform = "scale(1.08)";
+    }}
+    onMouseOut={(e) => {
+      (e.currentTarget as HTMLButtonElement).style.transform = "scale(1)";
+    }}
+  >
+    {children}
+  </button>
+);
+
+// ─── Duration Timer ───────────────────────────────────────────────────────────
+
+const DurationTimer = () => {
+  const [seconds, setSeconds] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setSeconds((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  const fmt = (n: number) => n.toString().padStart(2, "0");
+  return (
+    <span
+      style={{
+        color: "rgba(255,255,255,0.5)",
+        fontSize: 12,
+        fontFeatureSettings: "'tnum'",
+      }}
+    >
+      {h > 0 ? `${fmt(h)}:` : ""}
+      {fmt(m)}:{fmt(s)}
+    </span>
+  );
+};
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function VideoCallApp({
   initialRoom = "",
   initialName = "",
 }: VideoCallProps) {
-  // State management
-  const [roomName, setRoomName] = useState<string>(initialRoom);
-  const [participantName, setParticipantName] = useState<string>(initialName);
-  const [isJoined, setIsJoined] = useState<boolean>(false);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [roomName, setRoomName] = useState(initialRoom);
+  const [participantName, setParticipantName] = useState(initialName);
+  const [isJoined, setIsJoined] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [room, setRoom] = useState<Room | null>(null);
   const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
   const [localParticipant, setLocalParticipant] =
     useState<LocalParticipant | null>(null);
-  const [connectionState, setConnectionState] = useState<ConnectionState>(
-    ConnectionState.Disconnected
-  );
-  const [isVideoEnabled, setIsVideoEnabled] = useState<boolean>(true);
-  const [isAudioEnabled, setIsAudioEnabled] = useState<boolean>(true);
-  const [isScreenSharing, setIsScreenSharing] = useState<boolean>(false);
+  const [isVideoEnabled, setIsVideoEnabled] = useState(true);
+  const [isAudioEnabled, setIsAudioEnabled] = useState(true);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [showChat, setShowChat] = useState(false);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [messageInput, setMessageInput] = useState("");
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Helper function to get video track from participant
-  const getVideoTrack = (participant: Participant): VideoTrack | undefined => {
-    const videoPublication = participant.videoTrackPublications
-      .values()
-      .next().value;
-    return videoPublication?.track as VideoTrack;
-  };
+  // ── Track helpers ─────────────────────────────────────────────────────────
 
-  // Helper function to get audio track from participant
-  const getAudioTrack = (participant: Participant): AudioTrack | undefined => {
-    const audioPublication = participant.audioTrackPublications
-      .values()
-      .next().value;
-    return audioPublication?.track as AudioTrack;
-  };
+  const getParticipantTracks = (p: Participant) => {
+    let videoTrack: VideoTrack | undefined;
+    let audioTrack: AudioTrack | undefined;
+    let screenShareTrack: VideoTrack | undefined;
 
-  // Check audio devices
-  const checkAudioDevices = useCallback(async () => {
-    try {
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const audioInputs = devices.filter(
-        (device) => device.kind === "audioinput"
-      );
-
-      if (audioInputs.length === 0) {
-        toast.error("No microphone found");
-        return false;
+    p.trackPublications.forEach((pub) => {
+      if (!pub.track) return;
+      if (pub.kind === Track.Kind.Video) {
+        if (pub.source === Track.Source.ScreenShare)
+          screenShareTrack = pub.track as VideoTrack;
+        else videoTrack = pub.track as VideoTrack;
+      } else if (pub.kind === Track.Kind.Audio) {
+        audioTrack = pub.track as AudioTrack;
       }
+    });
 
-      return true;
-    } catch (error) {
-      console.error("Error checking audio devices:", error);
-      toast.error("Cannot access audio devices");
-      return false;
-    }
+    return { videoTrack, audioTrack, screenShareTrack };
+  };
+
+  const updateParticipants = useCallback((r: Room) => {
+    const list: ParticipantInfo[] = [];
+    const lp = r.localParticipant;
+    const lt = getParticipantTracks(lp);
+    list.push({
+      identity: lp.identity,
+      name: lp.name || lp.identity,
+      isLocal: true,
+      ...lt,
+      isVideoEnabled: lp.isCameraEnabled,
+      isAudioEnabled: lp.isMicrophoneEnabled,
+      isSpeaking: lp.isSpeaking,
+    });
+    r.remoteParticipants.forEach((rp) => {
+      const rt = getParticipantTracks(rp);
+      list.push({
+        identity: rp.identity,
+        name: rp.name || rp.identity,
+        isLocal: false,
+        ...rt,
+        isVideoEnabled: rp.isCameraEnabled,
+        isAudioEnabled: rp.isMicrophoneEnabled,
+        isSpeaking: rp.isSpeaking,
+      });
+    });
+    setParticipants(list);
   }, []);
 
-  // Check browser support
-  const checkBrowserSupport = useCallback(() => {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      toast.error("Your browser does not support video calls");
-      return false;
-    }
-    return true;
+  // ── Chat ──────────────────────────────────────────────────────────────────
+
+  const handleDataReceived = useCallback(
+    (payload: Uint8Array, participant?: RemoteParticipant) => {
+      try {
+        const msg = JSON.parse(new TextDecoder().decode(payload));
+        if (msg.type === "chat") {
+          const newMsg: ChatMessage = {
+            id: `${Date.now()}-${Math.random()}`,
+            message: msg.text,
+            from: {
+              identity: participant?.identity || "unknown",
+              name: participant?.name || participant?.identity || "Unknown",
+            },
+            timestamp: Date.now(),
+          };
+          setChatMessages((prev) => [...prev, newMsg]);
+          setUnreadCount((c) => c + 1);
+        }
+      } catch {}
+    },
+    [],
+  );
+
+  const handleToggleChat = useCallback(() => {
+    setShowChat((p) => !p);
+    setUnreadCount(0);
   }, []);
 
-  // Join room function
+  const sendChatMessage = useCallback(async () => {
+    if (!messageInput.trim() || !localParticipant || isSendingMessage) return;
+    setIsSendingMessage(true);
+    try {
+      const data = new TextEncoder().encode(
+        JSON.stringify({ type: "chat", text: messageInput.trim() }),
+      );
+      await localParticipant.publishData(data, { reliable: true });
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          id: `${Date.now()}-${Math.random()}`,
+          message: messageInput.trim(),
+          from: {
+            identity: localParticipant.identity,
+            name: localParticipant.name || localParticipant.identity,
+          },
+          timestamp: Date.now(),
+        },
+      ]);
+      setMessageInput("");
+    } catch {
+      toast.error("Failed to send message");
+    } finally {
+      setIsSendingMessage(false);
+    }
+  }, [messageInput, localParticipant, isSendingMessage]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages]);
+
+  // ── Join ──────────────────────────────────────────────────────────────────
+
   const joinRoom = useCallback(async () => {
     if (!roomName.trim() || !participantName.trim()) {
-      toast.error("Please enter both room name and participant name");
+      toast.error("Enter room name and your name");
       return;
     }
-
-    // Check browser support
-    if (!checkBrowserSupport()) {
-      return;
-    }
-
     setIsLoading(true);
-
     try {
-      // Check for audio permissions first
+      // Create tracks up-front to ensure permissions are granted before connecting
+      let videoTrack: VideoTrack;
+      let audioTrack: AudioTrack;
       try {
-        await navigator.mediaDevices.getUserMedia({ audio: true });
-      } catch (permissionError) {
-        toast.error("Please allow microphone access to join the call");
-        setIsLoading(false);
-        return;
-      }
-
-      // Check audio devices
-      const hasAudioDevices = await checkAudioDevices();
-      if (!hasAudioDevices) {
-        setIsLoading(false);
-        return;
-      }
-
-      // Create room instance
-      const newRoom = new Room({
-        adaptiveStream: true,
-        dynacast: true,
-        videoCaptureDefaults: {
+        videoTrack = await createLocalVideoTrack({
           resolution: VideoPresets.h720.resolution,
-          frameRate: 30,
-          facingMode: "user",
-        },
-        publishDefaults: {
-          videoEncoding: {
-            maxBitrate: 1_500_000,
-            maxFramerate: 30,
-          },
-          audioPreset: AudioPresets.speech,
-          videoSimulcastLayers: [
-            VideoPresets.h360,
-            VideoPresets.h540,
-            VideoPresets.h720,
-          ],
-        },
-      });
-
-      // Get token from your API
-      const response = await fetch("/api/token", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          room: roomName,
-          username: participantName,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to get access token");
+        });
+      } catch {
+        toast.error("Cannot access camera");
+        setIsLoading(false);
+        return;
+      }
+      try {
+        audioTrack = await createLocalAudioTrack();
+      } catch {
+        videoTrack.stop();
+        toast.error("Cannot access microphone");
+        setIsLoading(false);
+        return;
       }
 
-      const { token } = await response.json();
+      const newRoom = new Room({ adaptiveStream: true, dynacast: true });
 
-      // Set up event listeners
+      const res = await fetch("/api/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ room: roomName, username: participantName }),
+      });
+      if (!res.ok) throw new Error("Token fetch failed");
+      const { token } = await res.json();
+
       newRoom.on(RoomEvent.Connected, async () => {
-        setConnectionState(ConnectionState.Connected);
         setIsJoined(true);
-        toast.success("Successfully joined the room!");
-
-        // Enable audio and video after connection
+        toast.success("Joined!");
         try {
-          await newRoom.localParticipant.enableCameraAndMicrophone();
-          setIsAudioEnabled(true);
+          await newRoom.localParticipant.publishTrack(videoTrack);
+          await newRoom.localParticipant.publishTrack(audioTrack);
           setIsVideoEnabled(true);
-        } catch (error) {
-          console.error("Failed to enable camera/microphone:", error);
-          toast.error("Failed to enable camera or microphone");
+          setIsAudioEnabled(true);
+          // Small delay to let track publications propagate
+          setTimeout(() => updateParticipants(newRoom), 300);
+        } catch {
+          toast.error("Failed to publish media");
         }
       });
 
       newRoom.on(RoomEvent.Disconnected, () => {
-        setConnectionState(ConnectionState.Disconnected);
         setIsJoined(false);
-        toast.info("Disconnected from room");
+        videoTrack.stop();
+        audioTrack.stop();
+        toast.info("Disconnected");
       });
 
-      newRoom.on(
-        RoomEvent.ParticipantConnected,
-        (participant: RemoteParticipant) => {
-          toast.success(
-            `${participant.name || participant.identity} joined the room`
-          );
-          updateParticipants(newRoom);
-        }
+      newRoom.on(RoomEvent.ParticipantConnected, (p: RemoteParticipant) => {
+        toast.success(`${p.name || p.identity} joined`);
+        updateParticipants(newRoom);
+      });
+      newRoom.on(RoomEvent.ParticipantDisconnected, (p: RemoteParticipant) => {
+        toast.info(`${p.name || p.identity} left`);
+        updateParticipants(newRoom);
+      });
+      newRoom.on(RoomEvent.TrackSubscribed, () => updateParticipants(newRoom));
+      newRoom.on(RoomEvent.TrackUnsubscribed, () =>
+        updateParticipants(newRoom),
       );
-
-      newRoom.on(
-        RoomEvent.ParticipantDisconnected,
-        (participant: RemoteParticipant) => {
-          toast.info(
-            `${participant.name || participant.identity} left the room`
-          );
-          updateParticipants(newRoom);
-        }
+      newRoom.on(RoomEvent.LocalTrackPublished, (pub) => {
+        if (pub.source === Track.Source.ScreenShare) setIsScreenSharing(true);
+        updateParticipants(newRoom);
+      });
+      newRoom.on(RoomEvent.LocalTrackUnpublished, (pub) => {
+        if (pub.source === Track.Source.ScreenShare) setIsScreenSharing(false);
+        updateParticipants(newRoom);
+      });
+      newRoom.on(RoomEvent.TrackMuted, () => updateParticipants(newRoom));
+      newRoom.on(RoomEvent.TrackUnmuted, () => updateParticipants(newRoom));
+      newRoom.on(RoomEvent.ActiveSpeakersChanged, () =>
+        updateParticipants(newRoom),
       );
+      newRoom.on(RoomEvent.DataReceived, handleDataReceived);
 
-      newRoom.on(RoomEvent.TrackSubscribed, () => {
-        updateParticipants(newRoom);
-      });
-
-      newRoom.on(RoomEvent.TrackUnsubscribed, () => {
-        updateParticipants(newRoom);
-      });
-
-      newRoom.on(RoomEvent.LocalTrackPublished, () => {
-        updateParticipants(newRoom);
-      });
-
-      newRoom.on(RoomEvent.LocalTrackUnpublished, () => {
-        updateParticipants(newRoom);
-      });
-
-      newRoom.on(RoomEvent.TrackMuted, () => {
-        updateParticipants(newRoom);
-      });
-
-      newRoom.on(RoomEvent.TrackUnmuted, () => {
-        updateParticipants(newRoom);
-      });
-
-      // Connect to room
-      await newRoom.connect(process.env.NEXT_PUBLIC_LIVEKIT_URL!, token);
+      const url = process.env.NEXT_PUBLIC_LIVEKIT_URL;
+      if (!url) throw new Error("NEXT_PUBLIC_LIVEKIT_URL not set");
+      await newRoom.connect(url, token);
 
       setRoom(newRoom);
       setLocalParticipant(newRoom.localParticipant);
-      updateParticipants(newRoom);
-    } catch (error) {
-      console.error("Error joining room:", error);
-      toast.error("Failed to join room. Please try again.");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to join room");
     } finally {
       setIsLoading(false);
     }
-  }, [roomName, participantName, checkBrowserSupport, checkAudioDevices]);
+  }, [roomName, participantName, updateParticipants, handleDataReceived]);
 
-  // Update participants function
-  const updateParticipants = useCallback((room: Room) => {
-    const allParticipants: ParticipantInfo[] = [];
+  // ── Controls ──────────────────────────────────────────────────────────────
 
-    // Add local participant
-    const localPart = room.localParticipant;
-    allParticipants.push({
-      identity: localPart.identity,
-      name: localPart.name || localPart.identity,
-      isLocal: true,
-      videoTrack: getVideoTrack(localPart),
-      audioTrack: getAudioTrack(localPart),
-      isVideoEnabled: localPart.isCameraEnabled,
-      isAudioEnabled: localPart.isMicrophoneEnabled,
-    });
-
-    // Add remote participants
-    room.remoteParticipants.forEach((participant) => {
-      allParticipants.push({
-        identity: participant.identity,
-        name: participant.name || participant.identity,
-        isLocal: false,
-        videoTrack: getVideoTrack(participant),
-        audioTrack: getAudioTrack(participant),
-        isVideoEnabled: participant.isCameraEnabled,
-        isAudioEnabled: participant.isMicrophoneEnabled,
-      });
-    });
-
-    setParticipants(allParticipants);
-  }, []);
-
-  // Toggle video function
   const toggleVideo = useCallback(async () => {
     if (!localParticipant) return;
-
     try {
-      const newVideoState = !isVideoEnabled;
-      await localParticipant.setCameraEnabled(newVideoState);
-      setIsVideoEnabled(newVideoState);
-
-      // Force update participants to reflect the change
-      if (room) {
-        updateParticipants(room);
-      }
-
-      toast.success(newVideoState ? "Camera turned on" : "Camera turned off");
-    } catch (error) {
-      console.error("Failed to toggle camera:", error);
-      toast.error("Failed to toggle camera");
+      const next = !isVideoEnabled;
+      await localParticipant.setCameraEnabled(next);
+      setIsVideoEnabled(next);
+      if (room) updateParticipants(room);
+    } catch {
+      toast.error("Cannot toggle camera");
     }
   }, [localParticipant, isVideoEnabled, room, updateParticipants]);
 
-  // Toggle audio function
   const toggleAudio = useCallback(async () => {
     if (!localParticipant) return;
-
     try {
-      const newAudioState = !isAudioEnabled;
-      await localParticipant.setMicrophoneEnabled(newAudioState);
-      setIsAudioEnabled(newAudioState);
-
-      // Force update participants to reflect the change
-      if (room) {
-        updateParticipants(room);
-      }
-
-      toast.success(newAudioState ? "Microphone unmuted" : "Microphone muted");
-    } catch (error) {
-      console.error("Failed to toggle microphone:", error);
-      toast.error("Failed to toggle microphone");
+      const next = !isAudioEnabled;
+      await localParticipant.setMicrophoneEnabled(next);
+      setIsAudioEnabled(next);
+      if (room) updateParticipants(room);
+    } catch {
+      toast.error("Cannot toggle microphone");
     }
   }, [localParticipant, isAudioEnabled, room, updateParticipants]);
 
-  // Toggle screen share function
   const toggleScreenShare = useCallback(async () => {
     if (!localParticipant) return;
-
     try {
       if (isScreenSharing) {
         await localParticipant.setScreenShareEnabled(false);
         setIsScreenSharing(false);
         toast.success("Screen sharing stopped");
       } else {
-        await localParticipant.setScreenShareEnabled(true);
+        await localParticipant.setScreenShareEnabled(true, { audio: true });
         setIsScreenSharing(true);
         toast.success("Screen sharing started");
       }
-    } catch (error) {
-      console.error("Failed to toggle screen sharing:", error);
-      toast.error("Failed to toggle screen sharing");
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        if (err.name !== "NotAllowedError") {
+          toast.error("Failed to share screen");
+        }
+      }
+      setIsScreenSharing(false);
     }
   }, [localParticipant, isScreenSharing]);
 
-  // Leave room function
   const leaveRoom = useCallback(async () => {
     if (room) {
       await room.disconnect();
@@ -973,314 +977,602 @@ export default function VideoCallApp({
       setIsVideoEnabled(true);
       setIsAudioEnabled(true);
       setIsScreenSharing(false);
-      toast.success("Left the room");
+      setChatMessages([]);
+      setShowChat(false);
     }
   }, [room]);
 
-  // Copy room link function
   const copyRoomLink = useCallback(() => {
-    const roomLink = `${window.location.origin}?room=${encodeURIComponent(
-      roomName
-    )}`;
-    navigator.clipboard.writeText(roomLink);
-    toast.success("Room link copied to clipboard!");
+    navigator.clipboard.writeText(
+      `${window.location.origin}?room=${encodeURIComponent(roomName)}`,
+    );
+    toast.success("Invite link copied!");
   }, [roomName]);
 
-  // Video component for participants
-  const VideoComponent = ({
-    participant,
-  }: {
-    participant: ParticipantInfo;
-  }) => {
-    const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(
-      null
-    );
-    const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(
-      null
-    );
-
-    useEffect(() => {
-      if (videoElement && participant.videoTrack) {
-        participant.videoTrack.attach(videoElement);
-        return () => {
-          participant.videoTrack?.detach(videoElement);
-        };
-      }
-    }, [videoElement, participant.videoTrack]);
-
-    // Add audio track attachment for remote participants
-    useEffect(() => {
-      if (audioElement && participant.audioTrack && !participant.isLocal) {
-        participant.audioTrack.attach(audioElement);
-        return () => {
-          participant.audioTrack?.detach(audioElement);
-        };
-      }
-    }, [audioElement, participant.audioTrack, participant.isLocal]);
-
-    return (
-      <div className="relative group">
-        <Card className="overflow-hidden bg-slate-900/50 backdrop-blur-sm border-slate-700/50">
-          <CardContent className="p-0">
-            <div className="aspect-video bg-slate-800 flex items-center justify-center relative">
-              {participant.videoTrack && participant.isVideoEnabled ? (
-                <video
-                  ref={setVideoElement}
-                  className="w-full h-full object-cover"
-                  autoPlay
-                  playsInline
-                  muted={participant.isLocal}
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center text-white font-bold text-xl">
-                    {participant.name.charAt(0).toUpperCase()}
-                  </div>
-                </div>
-              )}
-
-              {/* Audio element for remote participants */}
-              {!participant.isLocal && (
-                <audio
-                  ref={setAudioElement}
-                  autoPlay
-                  playsInline
-                  style={{ display: "none" }}
-                />
-              )}
-
-              {/* Participant info overlay */}
-              <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Badge
-                    variant={participant.isLocal ? "default" : "secondary"}
-                    className="text-xs"
-                  >
-                    {participant.name}
-                    {participant.isLocal && " (You)"}
-                  </Badge>
-                </div>
-                <div className="flex items-center gap-1">
-                  {!participant.isAudioEnabled && (
-                    <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
-                      <MicOff className="w-3 h-3 text-white" />
-                    </div>
-                  )}
-                  {!participant.isVideoEnabled && (
-                    <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
-                      <VideoOff className="w-3 h-3 text-white" />
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  };
-
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (room) {
-        room.disconnect();
-      }
+      room?.disconnect();
     };
   }, [room]);
 
-  // Join screen
+  // ── Grid layout ───────────────────────────────────────────────────────────
+
+  const gridStyle = (): React.CSSProperties => {
+    const n = participants.length;
+    if (n <= 1) return { gridTemplateColumns: "1fr", gridTemplateRows: "1fr" };
+    if (n === 2)
+      return { gridTemplateColumns: "1fr 1fr", gridTemplateRows: "1fr" };
+    if (n <= 4)
+      return { gridTemplateColumns: "1fr 1fr", gridTemplateRows: "1fr 1fr" };
+    return { gridTemplateColumns: "1fr 1fr 1fr", gridTemplateRows: "1fr 1fr" };
+  };
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // JOIN SCREEN
+  // ────────────────────────────────────────────────────────────────────────────
+
   if (!isJoined) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
-        <div className="w-full max-w-md">
-          <Card className="bg-white/10 backdrop-blur-xl border-white/20 shadow-2xl">
-            <CardHeader className="text-center">
-              <CardTitle className="text-3xl font-bold text-white mb-2">
-                Join Video Call
-              </CardTitle>
-              <p className="text-slate-300">
-                Enter your details to join the conversation
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-200">
-                  Room Name
-                </label>
-                <Input
-                  type="text"
-                  placeholder="Enter room name"
-                  value={roomName}
-                  onChange={(e) => setRoomName(e.target.value)}
-                  className="bg-white/10 border-white/20 text-white placeholder:text-slate-400"
-                />
-              </div>
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "#050508",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 24,
+          position: "relative",
+          overflow: "hidden",
+          fontFamily: "'DM Sans', 'Segoe UI', sans-serif",
+        }}
+      >
+        {/* Ambient blobs */}
+        <div
+          style={{
+            position: "absolute",
+            top: "15%",
+            left: "-10%",
+            width: 500,
+            height: 500,
+            borderRadius: "50%",
+            background:
+              "radial-gradient(circle, rgba(124,58,237,0.25), transparent 70%)",
+            filter: "blur(40px)",
+            animation: "blob1 8s ease-in-out infinite",
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            bottom: "10%",
+            right: "-10%",
+            width: 500,
+            height: 500,
+            borderRadius: "50%",
+            background:
+              "radial-gradient(circle, rgba(219,39,119,0.2), transparent 70%)",
+            filter: "blur(40px)",
+            animation: "blob2 10s ease-in-out infinite",
+          }}
+        />
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-200">
-                  Your Name
-                </label>
-                <Input
-                  type="text"
-                  placeholder="Enter your name"
-                  value={participantName}
-                  onChange={(e) => setParticipantName(e.target.value)}
-                  className="bg-white/10 border-white/20 text-white placeholder:text-slate-400"
-                />
-              </div>
+        <style>{`
+          @keyframes blob1 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(40px,-30px) scale(1.1)} }
+          @keyframes blob2 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(-30px,40px) scale(1.08)} }
+          @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+          input::placeholder { color: rgba(255,255,255,0.25) !important; }
+          input:focus { outline: none !important; border-color: rgba(124,58,237,0.6) !important; box-shadow: 0 0 0 3px rgba(124,58,237,0.15) !important; }
+        `}</style>
 
-              <Button
+        <div
+          style={{
+            position: "relative",
+            zIndex: 10,
+            width: "100%",
+            maxWidth: 420,
+          }}
+        >
+          {/* Logo */}
+          <div style={{ textAlign: "center", marginBottom: 48 }}>
+            <div
+              style={{
+                display: "inline-flex",
+                width: 72,
+                height: 72,
+                borderRadius: 22,
+                background: "linear-gradient(135deg, #7c3aed, #db2777)",
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: 20,
+                boxShadow: "0 16px 48px rgba(124,58,237,0.45)",
+              }}
+            >
+              <Video size={32} color="#fff" />
+            </div>
+            <h1
+              style={{
+                color: "#fff",
+                fontSize: 40,
+                fontWeight: 800,
+                margin: "0 0 8px",
+                letterSpacing: -1,
+              }}
+            >
+              Konek
+            </h1>
+            <p
+              style={{
+                color: "rgba(255,255,255,0.35)",
+                fontSize: 15,
+                margin: 0,
+              }}
+            >
+              Crystal-clear video calls, instantly.
+            </p>
+          </div>
+
+          {/* Card */}
+          <div
+            style={{
+              background: "rgba(255,255,255,0.04)",
+              backdropFilter: "blur(20px)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: 24,
+              padding: 32,
+              boxShadow: "0 32px 80px rgba(0,0,0,0.5)",
+            }}
+          >
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <input
+                type="text"
+                placeholder="Room name"
+                value={roomName}
+                onChange={(e) => setRoomName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (
+                    e.key === "Enter" &&
+                    roomName.trim() &&
+                    participantName.trim() &&
+                    !isLoading
+                  )
+                    joinRoom();
+                }}
+                autoFocus
+                style={{
+                  height: 52,
+                  background: "rgba(255,255,255,0.05)",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  borderRadius: 14,
+                  padding: "0 18px",
+                  color: "#fff",
+                  fontSize: 15,
+                  transition: "all 0.2s",
+                  fontFamily: "inherit",
+                }}
+              />
+              <input
+                type="text"
+                placeholder="Your name"
+                value={participantName}
+                onChange={(e) => setParticipantName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (
+                    e.key === "Enter" &&
+                    roomName.trim() &&
+                    participantName.trim() &&
+                    !isLoading
+                  )
+                    joinRoom();
+                }}
+                style={{
+                  height: 52,
+                  background: "rgba(255,255,255,0.05)",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  borderRadius: 14,
+                  padding: "0 18px",
+                  color: "#fff",
+                  fontSize: 15,
+                  transition: "all 0.2s",
+                  fontFamily: "inherit",
+                }}
+              />
+              <button
                 onClick={joinRoom}
                 disabled={
                   isLoading || !roomName.trim() || !participantName.trim()
                 }
-                className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-3 rounded-lg transition-all duration-200 transform hover:scale-105"
+                style={{
+                  height: 52,
+                  background:
+                    isLoading || !roomName.trim() || !participantName.trim()
+                      ? "rgba(255,255,255,0.08)"
+                      : "linear-gradient(135deg, #7c3aed, #db2777)",
+                  border: "none",
+                  borderRadius: 14,
+                  color: "#fff",
+                  fontSize: 15,
+                  fontWeight: 700,
+                  cursor:
+                    isLoading || !roomName.trim() || !participantName.trim()
+                      ? "not-allowed"
+                      : "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 10,
+                  transition: "all 0.2s",
+                  boxShadow:
+                    !isLoading && roomName.trim() && participantName.trim()
+                      ? "0 8px 24px rgba(124,58,237,0.4)"
+                      : "none",
+                  fontFamily: "inherit",
+                }}
               >
                 {isLoading ? (
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Joining...
-                  </div>
+                  <>
+                    <div
+                      style={{
+                        width: 18,
+                        height: 18,
+                        border: "2px solid rgba(255,255,255,0.3)",
+                        borderTopColor: "#fff",
+                        borderRadius: "50%",
+                        animation: "spin 0.7s linear infinite",
+                      }}
+                    />
+                    Connecting…
+                  </>
                 ) : (
-                  <div className="flex items-center gap-2">
-                    <Video className="w-5 h-5" />
+                  <>
+                    <Video size={18} />
                     Join Room
-                  </div>
+                  </>
                 )}
-              </Button>
+              </button>
 
-              {roomName && (
-                <div className="pt-4 border-t border-white/20">
-                  <Button
-                    onClick={copyRoomLink}
-                    variant="outline"
-                    className="w-full bg-transparent border-white/20 text-white hover:bg-white/10"
-                  >
-                    <Copy className="w-4 h-4 mr-2" />
-                    Copy Room Link
-                  </Button>
-                </div>
+              {roomName.trim() && (
+                <button
+                  onClick={copyRoomLink}
+                  style={{
+                    height: 44,
+                    background: "transparent",
+                    border: "1px solid rgba(255,255,255,0.08)",
+                    borderRadius: 14,
+                    color: "rgba(255,255,255,0.45)",
+                    fontSize: 13,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 8,
+                    transition: "all 0.2s",
+                    fontFamily: "inherit",
+                  }}
+                >
+                  <Copy size={14} />
+                  Copy invite link
+                </button>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
+
+          {/* Features strip */}
+          <div
+            style={{
+              marginTop: 28,
+              display: "flex",
+              justifyContent: "center",
+              gap: 28,
+              color: "rgba(255,255,255,0.3)",
+              fontSize: 12,
+            }}
+          >
+            {[
+              { dot: "#22c55e", label: "HD Video" },
+              { dot: "#3b82f6", label: "Screen Share" },
+              { dot: "#a78bfa", label: "Live Chat" },
+            ].map(({ dot, label }) => (
+              <div
+                key={label}
+                style={{ display: "flex", alignItems: "center", gap: 6 }}
+              >
+                <div
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: "50%",
+                    background: dot,
+                    animation: "pulse 2s ease-in-out infinite",
+                  }}
+                />
+                {label}
+              </div>
+            ))}
+          </div>
         </div>
+
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
 
-  // Video call interface
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-      {/* Header */}
-      <div className="bg-black/20 backdrop-blur-sm border-b border-white/10 p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <h1 className="text-xl font-bold text-white">{roomName}</h1>
-            <Badge variant="outline" className="border-white/20 text-white">
-              <Users className="w-4 h-4 mr-1" />
-              {participants.length} participant
-              {participants.length !== 1 ? "s" : ""}
-            </Badge>
-          </div>
+  // ────────────────────────────────────────────────────────────────────────────
+  // CALL INTERFACE
+  // ────────────────────────────────────────────────────────────────────────────
 
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={copyRoomLink}
-              variant="outline"
-              size="sm"
-              className="border-white/20 text-white hover:bg-white/10"
-            >
-              <Copy className="w-4 h-4 mr-1" />
-              Copy Link
-            </Button>
-            <Button
-              onClick={leaveRoom}
-              variant="destructive"
-              size="sm"
-              className="bg-red-600 hover:bg-red-700"
-            >
-              <PhoneOff className="w-4 h-4 mr-1" />
-              Leave
-            </Button>
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#050508",
+        display: "flex",
+        flexDirection: "column",
+        position: "relative",
+        overflow: "hidden",
+        fontFamily: "'DM Sans', 'Segoe UI', sans-serif",
+      }}
+    >
+      <style>{`
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        * { box-sizing: border-box; }
+      `}</style>
+
+      {/* Subtle ambient */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background:
+            "radial-gradient(ellipse at 20% 20%, rgba(124,58,237,0.07), transparent 60%), radial-gradient(ellipse at 80% 80%, rgba(219,39,119,0.06), transparent 60%)",
+          pointerEvents: "none",
+        }}
+      />
+
+      {/* ── Top bar ── */}
+      <div
+        style={{
+          position: "relative",
+          zIndex: 20,
+          padding: "12px 20px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          background: "rgba(5,5,8,0.7)",
+          backdropFilter: "blur(16px)",
+          borderBottom: "1px solid rgba(255,255,255,0.06)",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <div
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: 12,
+              background: "linear-gradient(135deg, #7c3aed, #db2777)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Video size={18} color="#fff" />
           </div>
+          <div>
+            <div style={{ color: "#fff", fontWeight: 700, fontSize: 15 }}>
+              {roomName}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Clock size={11} style={{ color: "rgba(255,255,255,0.3)" }} />
+              <DurationTimer />
+            </div>
+          </div>
+          <div
+            style={{
+              padding: "4px 10px",
+              borderRadius: 99,
+              background: "rgba(34,197,94,0.12)",
+              border: "1px solid rgba(34,197,94,0.25)",
+              color: "#22c55e",
+              fontSize: 12,
+              fontWeight: 600,
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            <div
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: "50%",
+                background: "#22c55e",
+                animation: "pulse 2s ease-in-out infinite",
+              }}
+            />
+            Live
+          </div>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div
+            style={{
+              padding: "5px 12px",
+              borderRadius: 99,
+              background: "rgba(255,255,255,0.05)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              color: "rgba(255,255,255,0.6)",
+              fontSize: 12,
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            <Users size={13} />
+            {participants.length}
+          </div>
+          <button
+            onClick={copyRoomLink}
+            style={{
+              padding: "7px 14px",
+              borderRadius: 10,
+              background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.1)",
+              color: "rgba(255,255,255,0.7)",
+              fontSize: 13,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontFamily: "inherit",
+            }}
+          >
+            <Copy size={13} />
+            Invite
+          </button>
+          <button
+            onClick={leaveRoom}
+            style={{
+              padding: "7px 14px",
+              borderRadius: 10,
+              background: "rgba(239,68,68,0.12)",
+              border: "1px solid rgba(239,68,68,0.3)",
+              color: "#ef4444",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontFamily: "inherit",
+            }}
+          >
+            <PhoneOff size={13} />
+            Leave
+          </button>
         </div>
       </div>
 
-      {/* Video Grid */}
-      <div className="flex-1 p-4">
+      {/* ── Video grid ── */}
+      <div
+        style={{
+          flex: 1,
+          padding: "16px 20px",
+          position: "relative",
+          zIndex: 10,
+          overflow: "hidden",
+        }}
+      >
         <div
-          className={`grid gap-4 h-full ${
-            participants.length === 1
-              ? "grid-cols-1"
-              : participants.length === 2
-              ? "grid-cols-2"
-              : participants.length <= 4
-              ? "grid-cols-2"
-              : "grid-cols-3"
-          }`}
+          style={{
+            display: "grid",
+            gap: 12,
+            height: "100%",
+            ...gridStyle(),
+          }}
         >
-          {participants.map((participant) => (
-            <VideoComponent
-              key={participant.identity}
-              participant={participant}
+          {participants.map((p) => (
+            <VideoTile
+              key={p.identity}
+              participant={p}
+              isLarge={participants.length <= 2}
             />
           ))}
         </div>
       </div>
 
-      {/* Control Bar */}
-      <div className="bg-black/20 backdrop-blur-sm border-t border-white/10 p-4">
-        <div className="flex items-center justify-center gap-4">
-          <Button
-            onClick={toggleAudio}
-            variant={isAudioEnabled ? "default" : "destructive"}
-            size="lg"
-            className="rounded-full w-12 h-12 p-0"
-          >
-            {isAudioEnabled ? (
-              <Mic className="w-6 h-6" />
-            ) : (
-              <MicOff className="w-6 h-6" />
-            )}
-          </Button>
+      {/* ── Control bar ── */}
+      <div
+        style={{
+          position: "relative",
+          zIndex: 20,
+          padding: "14px 20px 20px",
+          background: "rgba(5,5,8,0.8)",
+          backdropFilter: "blur(16px)",
+          borderTop: "1px solid rgba(255,255,255,0.06)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 10,
+        }}
+      >
+        <CtrlBtn
+          active={isAudioEnabled}
+          onClick={toggleAudio}
+          label={isAudioEnabled ? "Mute mic" : "Unmute mic"}
+        >
+          {isAudioEnabled ? <Mic size={20} /> : <MicOff size={20} />}
+        </CtrlBtn>
 
-          <Button
-            onClick={toggleVideo}
-            variant={isVideoEnabled ? "default" : "destructive"}
-            size="lg"
-            className="rounded-full w-12 h-12 p-0"
-          >
-            {isVideoEnabled ? (
-              <Video className="w-6 h-6" />
-            ) : (
-              <VideoOff className="w-6 h-6" />
-            )}
-          </Button>
+        <CtrlBtn
+          active={isVideoEnabled}
+          onClick={toggleVideo}
+          label={isVideoEnabled ? "Turn off camera" : "Turn on camera"}
+        >
+          {isVideoEnabled ? <Video size={20} /> : <VideoOff size={20} />}
+        </CtrlBtn>
 
-          <Button
-            onClick={toggleScreenShare}
-            variant={isScreenSharing ? "default" : "outline"}
-            size="lg"
-            className="rounded-full w-12 h-12 p-0"
-          >
-            {isScreenSharing ? (
-              <MonitorOff className="w-6 h-6" />
-            ) : (
-              <Monitor className="w-6 h-6" />
-            )}
-          </Button>
+        <CtrlBtn
+          active={isScreenSharing}
+          onClick={toggleScreenShare}
+          label={isScreenSharing ? "Stop sharing" : "Share screen"}
+        >
+          {isScreenSharing ? <MonitorOff size={20} /> : <Monitor size={20} />}
+        </CtrlBtn>
 
-          <Button
-            onClick={leaveRoom}
-            variant="destructive"
-            size="lg"
-            className="rounded-full w-12 h-12 p-0 bg-red-600 hover:bg-red-700"
-          >
-            <PhoneOff className="w-6 h-6" />
-          </Button>
+        {/* Chat button with unread badge */}
+        <div style={{ position: "relative" }}>
+          <CtrlBtn active={showChat} onClick={handleToggleChat} label="Chat">
+            <MessageCircle size={20} />
+          </CtrlBtn>
+          {unreadCount > 0 && !showChat && (
+            <div
+              style={{
+                position: "absolute",
+                top: -4,
+                right: -4,
+                width: 18,
+                height: 18,
+                borderRadius: "50%",
+                background: "linear-gradient(135deg, #7c3aed, #db2777)",
+                color: "#fff",
+                fontSize: 10,
+                fontWeight: 700,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                pointerEvents: "none",
+              }}
+            >
+              {unreadCount}
+            </div>
+          )}
         </div>
+
+        <div
+          style={{
+            width: 1,
+            height: 32,
+            background: "rgba(255,255,255,0.1)",
+            margin: "0 4px",
+          }}
+        />
+
+        <CtrlBtn active={false} danger onClick={leaveRoom} label="End call">
+          <PhoneOff size={20} />
+        </CtrlBtn>
       </div>
+
+      {/* ── Chat panel ── */}
+      <ChatPanel
+        showChat={showChat}
+        chatMessages={chatMessages}
+        messageInput={messageInput}
+        isSendingMessage={isSendingMessage}
+        currentUserIdentity={localParticipant?.identity || ""}
+        onToggleChat={handleToggleChat}
+        onMessageChange={setMessageInput}
+        onSendMessage={sendChatMessage}
+        messagesEndRef={messagesEndRef}
+      />
     </div>
   );
 }
