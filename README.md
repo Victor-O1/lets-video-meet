@@ -1,36 +1,147 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+🎥 LetsVideoMeet
 
-## Getting Started
+Crystal-clear video calls. Instantly.
 
-First, run the development server:
+Live Demo:
+👉 https://lets-video-meet-victor-o1s-projects.vercel.app/
 
-```bash
+LetsVideoMeet is a modern, browser-based video conferencing app built with Next.js and LiveKit. It supports HD video, real-time chat, screen sharing, and dynamic participant layouts — all with a sleek, glassmorphism-inspired UI.
+
+✨ Features
+
+🔐 Token-based room authentication
+
+🎥 HD video calling
+
+🎙️ Mute / unmute microphone
+
+📷 Toggle camera on/off
+
+🖥️ Screen sharing (with optional audio)
+
+💬 Real-time chat via LiveKit data channels
+
+👥 Dynamic participant grid layout
+
+🗣️ Active speaker detection
+
+⏱️ Call duration timer
+
+📎 Invite link sharing
+
+🎨 Modern UI with smooth animations
+
+🛠️ Tech Stack
+
+Framework: Next.js (App Router)
+
+Language: TypeScript
+
+Realtime Engine: LiveKit
+
+UI Icons: Lucide React
+
+Notifications: Sonner
+
+Deployment: Vercel
+
+🚀 Getting Started
+1️⃣ Clone the repository
+git clone https://github.com/your-username/lets-video-meet.git
+cd lets-video-meet
+
+2️⃣ Install dependencies
+npm install
+
+3️⃣ Setup environment variables
+
+Create a .env.local file:
+
+NEXT_PUBLIC_LIVEKIT_URL=your_livekit_server_url
+LIVEKIT_API_KEY=your_api_key
+LIVEKIT_API_SECRET=your_api_secret
+
+You’ll need a LiveKit server (self-hosted or LiveKit Cloud).
+
+4️⃣ Run the development server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Visit:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+http://localhost:3000
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+🔐 Token API
 
-## Learn More
+The app uses a /api/token endpoint to generate room tokens securely using your LiveKit API credentials.
 
-To learn more about Next.js, take a look at the following resources:
+This ensures:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Users can only join valid rooms
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Credentials are never exposed to the client
 
-## Deploy on Vercel
+📦 Deployment
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+This project is deployed on Vercel:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+🌍 Production URL:
+https://lets-video-meet-victor-o1s-projects.vercel.app/
+
+To deploy your own:
+
+vercel
+
+Make sure to add your environment variables in the Vercel dashboard.
+
+🧠 How It Works
+
+User enters room name + display name.
+
+App fetches a signed token from /api/token.
+
+Client connects to LiveKit server.
+
+Local video & audio tracks are created and published.
+
+Remote participants are dynamically rendered.
+
+Data channels handle real-time chat messaging.
+
+UI updates based on LiveKit room events.
+
+🎨 UI Highlights
+
+Glassmorphism design
+
+Animated ambient background
+
+Speaking indicators
+
+Gradient-based controls
+
+Responsive grid layout
+
+📸 Screenshots
+
+You can add screenshots here:
+
+/public/screenshots/join.png
+/public/screenshots/call.png
+
+📄 License
+
+MIT License
+
+💡 Future Improvements
+
+Waiting room support
+
+Recording support
+
+Virtual background
+
+Breakout rooms
+
+Mobile UI refinements
+
+Authentication (Google/GitHub)
